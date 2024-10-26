@@ -5,7 +5,6 @@ session_start();
 $loggedIn = isset($_SESSION['id_cliente']);
 
 if (!$loggedIn) {
-    // Si el cliente no está conectado, redirigir a la página de inicio de sesión
     $_SESSION['message'] = [
         'type' => 'warning',
         'text' => 'Debes iniciar sesión para ver tu carrito de compras.'
@@ -25,37 +24,18 @@ $productos_en_carrito = isset($_SESSION['carrito']) ? $_SESSION['carrito'] : [];
 
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carrito de Compras</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <style>
-        body {
-            background-color: #f8f9fa;
-        }
-
-        .navbar {
-            background-color: #343a40;
-            color: white;
-        }
-
-        .navbar-brand,
-        .nav-link {
-            color: white;
-        }
-
-        .navbar-brand:hover,
-        .nav-link:hover {
-            color: #ffc107;
-        }
-
-        .container {
-            margin-top: 20px;
-        }
+        body { background-color: #f8f9fa; }
+        .navbar { background-color: #343a40; color: white; }
+        .navbar-brand, .nav-link { color: white; }
+        .navbar-brand:hover, .nav-link:hover { color: #ffc107; }
+        .container { margin-top: 20px; }
     </style>
 </head>
 
@@ -69,22 +49,12 @@ $productos_en_carrito = isset($_SESSION['carrito']) ? $_SESSION['carrito'] : [];
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="principal_cliente.php">Inicio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="principal_cliente.php">Productos</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="principal_cliente.php">Categorías</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="logout_cliente.php">Cerrar Sesión</a>
-                    </li>
+                    <li class="nav-item"><a class="nav-link" href="principal_cliente.php">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link" href="principal_cliente.php">Productos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="logout_cliente.php">Cerrar Sesión</a></li>
                     <li class="nav-item">
                         <a class="nav-link" href="carrito.php">
-                            <i class="fas fa-shopping-cart"></i>
-                            Carrito
+                            <i class="fas fa-shopping-cart"></i> Carrito
                             <span class="badge bg-danger" id="cart-count">
                                 <?php echo isset($_SESSION['carrito']) ? array_sum(array_column($_SESSION['carrito'], 'cantidad')) : 0; ?>
                             </span>
@@ -114,21 +84,34 @@ $productos_en_carrito = isset($_SESSION['carrito']) ? $_SESSION['carrito'] : [];
                 <tbody>
                     <?php
                     $total_carrito = 0;
+
                     foreach ($productos_en_carrito as $id_producto => $detalle):
-                        // Obtener información del producto desde la base de datos
-                        $query = "SELECT nombre_producto, precio FROM producto WHERE id_producto = :id_producto";
+                        // Obtener detalles del producto con su promoción (si aplica)
+                        $query = "
+                            SELECT p.nombre_producto, 
+                                   p.precio, 
+                                   pr.precio_oferta 
+                            FROM producto p
+                            LEFT JOIN promocion pr 
+                                ON p.id_producto = pr.id_producto 
+                                AND pr.estado = 'Activo' 
+                                AND pr.fecha_fin >= CURDATE()
+                            WHERE p.id_producto = :id_producto
+                        ";
                         $stmt = $db->prepare($query);
                         $stmt->bindParam(':id_producto', $id_producto);
                         $stmt->execute();
                         $producto = $stmt->fetch(PDO::FETCH_ASSOC);
 
                         if ($producto):
-                            $total_producto = $producto['precio'] * $detalle['cantidad'];
+                            // Aplicar precio promocional si existe, sino usar el precio regular
+                            $precio_unitario = !empty($producto['precio_oferta']) ? $producto['precio_oferta'] : $producto['precio'];
+                            $total_producto = $precio_unitario * $detalle['cantidad'];
                             $total_carrito += $total_producto;
                     ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($producto['nombre_producto']); ?></td>
-                                <td>Q. <?php echo number_format($producto['precio'], 2); ?></td>
+                                <td>Q. <?php echo number_format($precio_unitario, 2); ?></td>
                                 <td>
                                     <form action="actualizar_carrito.php" method="POST" class="d-flex">
                                         <input type="hidden" name="id_producto" value="<?php echo $id_producto; ?>">
@@ -175,5 +158,4 @@ $productos_en_carrito = isset($_SESSION['carrito']) ? $_SESSION['carrito'] : [];
     <?php endif; ?>
 
 </body>
-
 </html>

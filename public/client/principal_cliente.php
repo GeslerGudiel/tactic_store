@@ -90,7 +90,41 @@ if ($pagina_actual > $total_paginas && $total_paginas > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tienda Virtual</title>
+
+    <title>
+        <?php
+        if (isset($_GET['search'])) {
+            echo "Resultados para '" . htmlspecialchars($_GET['search']) . "' - Tienda Virtual";
+        } elseif (isset($_GET['category'])) {
+            $categoria_seleccionada = $categorias[array_search($_GET['category'], array_column($categorias, 'id_categoria'))]['nombre_categoria'] ?? 'Categoría';
+            echo "Categoría: " . htmlspecialchars($categoria_seleccionada) . " - Tienda Virtual";
+        } else {
+            echo "Bienvenido a la Tienda Virtual - Los mejores productos en línea";
+        }
+        ?>
+    </title>
+
+    <meta name="description" content="<?php
+                                        if (isset($_GET['search'])) {
+                                            echo "Explora los resultados de búsqueda para '" . htmlspecialchars($_GET['search']) . "' en nuestra tienda en línea.";
+                                        } elseif (isset($_GET['category'])) {
+                                            echo "Productos disponibles en la categoría: " . htmlspecialchars($categoria_seleccionada) . ".";
+                                        } else {
+                                            echo "Descubre productos únicos en nuestra tienda virtual con precios competitivos y promociones.";
+                                        }
+                                        ?>">
+
+    <meta name="keywords" content="<?php
+                                    if (isset($_GET['search'])) {
+                                        echo htmlspecialchars($_GET['search']) . ", tienda virtual, productos en línea, comprar";
+                                    } elseif (isset($_GET['category'])) {
+                                        echo htmlspecialchars($categoria_seleccionada) . ", productos, tienda, promociones";
+                                    } else {
+                                        echo "tienda virtual, productos, ofertas, comprar en línea";
+                                    }
+                                    ?>">
+
+    <meta name="author" content="Tienda Virtual">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -174,6 +208,20 @@ if ($pagina_actual > $total_paginas && $total_paginas > 0) {
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
+        }
+
+        .product-link {
+            text-decoration: none;
+            /* Elimina el subrayado */
+            color: #000;
+            /* Cambia el color del texto a negro */
+            font-weight: bold;
+            /* Opcional: Hace el texto más visible */
+        }
+
+        .product-link:hover {
+            color: #0056b3;
+            /* Cambia el color del enlace al pasar el cursor (opcional) */
         }
 
         .search-bar .input-group-text {
@@ -327,8 +375,16 @@ if ($pagina_actual > $total_paginas && $total_paginas > 0) {
 
         <div class="product-grid" id="productos">
             <?php
-            $query = "SELECT id_producto, nombre_producto, precio, imagen, stock FROM producto WHERE estado = 'disponible'";
-
+            $query = "
+                SELECT p.id_producto, p.nombre_producto, p.precio, p.imagen, p.stock, p.slug, 
+                    pr.tipo_promocion, pr.precio_oferta, pr.porcentaje_descuento, pr.fecha_fin
+                FROM producto p
+                LEFT JOIN promocion pr 
+                    ON p.id_producto = pr.id_producto 
+                    AND pr.estado = 'Activo' 
+                    AND pr.fecha_fin >= CURDATE()
+                WHERE p.estado = 'disponible'
+                ";
             // Aplicar filtro de búsqueda
             if (!empty($_GET['search'])) {
                 $query .= " AND nombre_producto LIKE :search";
@@ -383,24 +439,46 @@ if ($pagina_actual > $total_paginas && $total_paginas > 0) {
 
             while ($producto = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 echo '<div class="product-item">';
-                // Solo la imagen será clicable
-                echo '<img src="../../uploads/productos/' . htmlspecialchars($producto['imagen']) . '" alt="' . htmlspecialchars($producto['nombre_producto']) . '" data-id="' . $producto['id_producto'] . '" data-bs-toggle="modal" data-bs-target="#detalleProductoModal" style="cursor: pointer;">';
-                echo '<h5>' . htmlspecialchars($producto['nombre_producto']) . '</h5>';
-                echo '<p><strong>Precio: </strong>Q. ' . number_format($producto['precio'], 2) . '</p>';
+
+                // Imagen del producto con evento JavaScript para abrir el modal
+                echo '<img src="../../uploads/productos/' . htmlspecialchars($producto['imagen']) . '" 
+                        alt="Producto: ' . htmlspecialchars($producto['nombre_producto']) . '" 
+                        class="product-image" 
+                        data-id="' . $producto['id_producto'] . '" 
+                        style="cursor: pointer; width: 100%; height: 200px; object-fit: scale-down;">';
+
+                // Título del producto con enlace SEO-friendly usando el slug de manera dinámica
+                echo '<h5>';
+                echo '<a href="detalle_producto.php?slug=' . urlencode($producto['slug']) . '" class="product-link">'
+                    . htmlspecialchars($producto['nombre_producto']) . '</a>';
+                echo '</h5>';
+
+                if (!empty($producto['precio_oferta'])) {
+                    // Mostrar precio con descuento y tipo de promoción
+                    echo '<p><strong>Oferta: </strong>Q. ' . number_format($producto['precio_oferta'], 2) . '</p>';
+                    echo '<p><span class="badge bg-success">' . htmlspecialchars($producto['tipo_promocion']) . '</span></p>';
+                    echo '<p><del>Antes: Q. ' . number_format($producto['precio'], 2) . '</del></p>';
+                } else {
+                    // Mostrar precio normal si no tiene promoción
+                    echo '<p><strong>Precio: </strong>Q. ' . number_format($producto['precio'], 2) . '</p>';
+                }
+
                 echo '<p><strong>Stock disponible: </strong>' . htmlspecialchars($producto['stock']) . '</p>';
 
                 if ($loggedIn) {
                     echo '<form class="agregar-carrito-form" action="agregar_al_carrito.php" method="POST">';
                     echo '<input type="hidden" name="id_producto" value="' . $producto['id_producto'] . '">';
-                    echo '<input type="number" name="cantidad" class="form-control me-2" value="1" min="1" max="' . htmlspecialchars($producto['stock']) . '" style="max-width: 100px; margin: 10px auto;">';
+                    echo '<input type="number" name="cantidad" class="form-control me-2" value="1" min="1" max="'
+                        . htmlspecialchars($producto['stock']) . '" style="max-width: 100px; margin: 10px auto;">';
                     echo '<button type="submit" class="btn btn-primary"><i class="fas fa-cart-plus"></i> Agregar al Carrito</button>';
                     echo '</form>';
                 } else {
                     echo '<a href="login_cliente.php" class="btn btn-warning"><i class="fas fa-exclamation-circle"></i> Inicia sesión para agregar al carrito</a>';
                 }
 
-                echo '</div>';
+                echo '</div>'; // Cerrar el div de product-item
             }
+
             ?>
         </div>
         <nav aria-label="Page navigation">
@@ -465,135 +543,149 @@ if ($pagina_actual > $total_paginas && $total_paginas > 0) {
         document.addEventListener("DOMContentLoaded", function() {
             const detalleProductoModal = document.getElementById('detalleProductoModal');
 
-            detalleProductoModal.addEventListener('show.bs.modal', function(event) {
-                const img = event.relatedTarget;
-                const productoId = img.getAttribute('data-id');
+            // Seleccionar todas las imágenes que abren el modal
+            document.querySelectorAll('.product-image').forEach(img => {
+                img.addEventListener('click', function() {
+                    const productoId = this.getAttribute('data-id'); // Obtener ID del producto
 
-                fetch(`obtener_detalles_producto.php?id_producto=${productoId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const modalBody = detalleProductoModal.querySelector('.modal-body');
-                        let content = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <img src="../../uploads/productos/${data.imagen}" alt="${data.nombre_producto}" class="img-fluid">
-                    </div>
-                    <div class="col-md-6">
-                        <h5>${data.nombre_producto}</h5>
-                        <p><strong>Precio: </strong>Q. ${data.precio}</p>
-                        <p><strong>Stock disponible: </strong>${data.stock}</p>
-                        <p><strong>Descripción: </strong>${data.descripcion}</p>
-                        <form id="modalAgregarCarritoForm" class="agregar-carrito-form" action="agregar_al_carrito.php" method="POST">
-                            <input type="hidden" name="id_producto" value="${data.id_producto}">
-                            <input type="number" name="cantidad" class="form-control me-2" value="1" min="1" max="${data.stock}" style="max-width: 100px; margin: 10px auto;">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-cart-plus"></i> Agregar al Carrito</button>
-                        </form>
-                    </div>
-                </div>
-                <hr>
-                <h5>Comentarios y Calificaciones</h5>
-                <div id="comentarios">
-            `;
-
-                        if (data.comentarios.length > 0) {
-                            data.comentarios.forEach(comentario => {
-                                content += `
-                        <div class="comentario">
-                            <p><strong>${comentario.nombre1} ${comentario.apellido1}</strong> 
-                            - Calificación: ${'★'.repeat(comentario.calificacion)}</p>
-                            <p>${comentario.comentario}</p>
-                            <small>${comentario.fecha_comentario}</small>
-                            ${comentario.respuesta ? `<p><strong>Respuesta de la tienda:</strong> ${comentario.respuesta}</p>` : ''}
-
-                            <hr>
+                    // Fetch para obtener los detalles del producto
+                    fetch(`obtener_detalles_producto.php?id_producto=${productoId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const modalBody = detalleProductoModal.querySelector('.modal-body');
+                            let content = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <img src="../../uploads/productos/${data.imagen}" 
+                                    alt="${data.nombre_producto}" class="img-fluid">
+                            </div>
+                            <div class="col-md-6">
+                                <h5>${data.nombre_producto}</h5>
+                                <p><strong>Precio: </strong>Q. ${data.precio}</p>
+                                <p><strong>Stock disponible: </strong>${data.stock}</p>
+                                <p><strong>Descripción: </strong>${data.descripcion}</p>
+                                <form id="modalAgregarCarritoForm" class="agregar-carrito-form" 
+                                      action="agregar_al_carrito.php" method="POST">
+                                    <input type="hidden" name="id_producto" value="${data.id_producto}">
+                                    <input type="number" name="cantidad" class="form-control me-2" 
+                                           value="1" min="1" max="${data.stock}" 
+                                           style="max-width: 100px; margin: 10px auto;">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-cart-plus"></i> Agregar al Carrito
+                                    </button>
+                                </form>
+                            </div>
                         </div>
+                        <hr>
+                        <h5>Comentarios y Calificaciones</h5>
+                        <div id="comentarios">
                     `;
-                            });
-                        } else {
-                            content += '<p>No hay comentarios aún.</p>';
-                        }
 
-                        content += `
-                </div>
-                <hr>
-                <h5>Deja tu Comentario</h5>
-                <form id="form-comentario" method="POST" action="guardar_comentario.php">
-                    <input type="hidden" name="id_producto" value="${data.id_producto}">
-                    <div class="mb-3">
-                        <label for="comentario" class="form-label">Comentario:</label>
-                        <textarea class="form-control" name="comentario" id="comentario" rows="3" required></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="calificacion" class="form-label">Calificación:</label>
-                        <select class="form-select" name="calificacion" id="calificacion" required>
-                            <option value="5">5 - Excelente</option>
-                            <option value="4">4 - Muy bueno</option>
-                            <option value="3">3 - Bueno</option>
-                            <option value="2">2 - Regular</option>
-                            <option value="1">1 - Malo</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Enviar Comentario</button>
-                </form>
-            `;
+                            // Generar comentarios dinámicamente
+                            if (data.comentarios.length > 0) {
+                                data.comentarios.forEach(comentario => {
+                                    content += `
+                                <div class="comentario">
+                                    <p><strong>${comentario.nombre1} ${comentario.apellido1}</strong> 
+                                    - Calificación: ${'★'.repeat(comentario.calificacion)}</p>
+                                    <p>${comentario.comentario}</p>
+                                    <small>${comentario.fecha_comentario}</small>
+                                    ${comentario.respuesta ? `<p><strong>Respuesta:</strong> ${comentario.respuesta}</p>` : ''}
+                                    <hr>
+                                </div>
+                            `;
+                                });
+                            } else {
+                                content += '<p>No hay comentarios aún.</p>';
+                            }
 
-                        modalBody.innerHTML = content;
+                            // Formulario para agregar comentarios
+                            content += `
+                        </div>
+                        <hr>
+                        <h5>Deja tu Comentario</h5>
+                        <form id="form-comentario" method="POST" action="guardar_comentario.php">
+                            <input type="hidden" name="id_producto" value="${data.id_producto}">
+                            <div class="mb-3">
+                                <label for="comentario" class="form-label">Comentario:</label>
+                                <textarea class="form-control" name="comentario" id="comentario" 
+                                          rows="3" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="calificacion" class="form-label">Calificación:</label>
+                                <select class="form-select" name="calificacion" id="calificacion" required>
+                                    <option value="5">5 - Excelente</option>
+                                    <option value="4">4 - Muy bueno</option>
+                                    <option value="3">3 - Bueno</option>
+                                    <option value="2">2 - Regular</option>
+                                    <option value="1">1 - Malo</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-paper-plane"></i> Enviar Comentario
+                            </button>
+                        </form>
+                    `;
 
-                        // Agregar la funcionalidad de agregar al carrito dentro del modal
-                        const modalForm = document.getElementById('modalAgregarCarritoForm');
-                        modalForm.addEventListener('submit', function(e) {
-                            e.preventDefault();
+                            modalBody.innerHTML = content;
 
-                            $.ajax({
-                                url: modalForm.action,
-                                method: modalForm.method,
-                                data: $(modalForm).serialize(),
-                                success: function(response) {
-                                    var data = JSON.parse(response);
+                            // Agregar funcionalidad de carrito desde el modal
+                            const modalForm = document.getElementById('modalAgregarCarritoForm');
+                            modalForm.addEventListener('submit', function(e) {
+                                e.preventDefault();
 
-                                    if (data.status === 'success') {
-                                        // Actualizar el contador del carrito en el navbar
-                                        $("#cart-count").text(function(i, oldval) {
-                                            return parseInt(oldval) + parseInt(modalForm.querySelector("input[name='cantidad']").value);
-                                        });
+                                $.ajax({
+                                    url: modalForm.action,
+                                    method: modalForm.method,
+                                    data: $(modalForm).serialize(),
+                                    success: function(response) {
+                                        const data = JSON.parse(response);
 
-                                        Swal.fire({
-                                            title: 'Producto agregado al carrito',
-                                            text: '¿Qué te gustaría hacer?',
-                                            icon: 'success',
-                                            showCancelButton: true,
-                                            confirmButtonText: 'Ir al carrito',
-                                            cancelButtonText: 'Seguir comprando',
-                                            allowOutsideClick: false
-                                        }).then((result) => {
-                                            if (result.isConfirmed) {
-                                                window.location.href = 'carrito.php';
-                                            }
-                                        });
+                                        if (data.status === 'success') {
+                                            $("#cart-count").text(function(i, oldval) {
+                                                return parseInt(oldval) + parseInt(modalForm.querySelector("input[name='cantidad']").value);
+                                            });
 
-                                        // Cerrar el modal después de agregar el producto
-                                        $('#detalleProductoModal').modal('hide');
-                                    } else {
+                                            Swal.fire({
+                                                title: 'Producto agregado al carrito',
+                                                text: '¿Qué te gustaría hacer?',
+                                                icon: 'success',
+                                                showCancelButton: true,
+                                                confirmButtonText: 'Ir al carrito',
+                                                cancelButtonText: 'Seguir comprando',
+                                                allowOutsideClick: false
+                                            }).then((result) => {
+                                                if (result.isConfirmed) {
+                                                    window.location.href = 'carrito.php';
+                                                }
+                                            });
+
+                                            $('#detalleProductoModal').modal('hide');
+                                        } else {
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Error',
+                                                text: data.message,
+                                                confirmButtonText: 'Aceptar'
+                                            });
+                                        }
+                                    },
+                                    error: function() {
                                         Swal.fire({
                                             icon: 'error',
                                             title: 'Error',
-                                            text: data.message,
+                                            text: 'Hubo un problema al agregar el producto al carrito.',
                                             confirmButtonText: 'Aceptar'
                                         });
                                     }
-                                },
-                                error: function() {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Error',
-                                        text: 'Hubo un problema al agregar el producto al carrito. Inténtalo de nuevo.',
-                                        confirmButtonText: 'Aceptar'
-                                    });
-                                }
+                                });
                             });
-                        });
-                    })
-                    .catch(error => console.error('Error al cargar los detalles del producto:', error));
+
+                            const modalInstance = new bootstrap.Modal(detalleProductoModal);
+                            modalInstance.show();
+                        })
+                        .catch(error => console.error('Error al cargar los detalles del producto:', error));
+                });
             });
         });
     </script>

@@ -3,7 +3,7 @@ session_start();
 
 // Verificar si el usuario tiene rol de administrador
 if (!isset($_SESSION['usuario_rol']) || ($_SESSION['usuario_rol'] !== 'administrador' && $_SESSION['usuario_rol'] !== 'superadmin')) {
-    header("Location: ../auth/login_admin.php");
+    header("Location: login_admin.php");
     exit;
 }
 

@@ -31,6 +31,17 @@ if ($stock == 0 && $estado === 'disponible') {
     $estado = 'no disponible';
 }
 
+// Función para generar slug
+function generarSlug($texto) {
+    $slug = strtolower(trim($texto));
+    $slug = preg_replace('/[^a-z0-9-]/', '-', $slug); // Reemplazar caracteres no permitidos por '-'
+    $slug = preg_replace('/-+/', '-', $slug); // Eliminar múltiples '-'
+    return trim($slug, '-');
+}
+
+// Generar slug para el producto
+$slug = generarSlug($nombre_producto);
+
 // Inicializar variables
 $imagen = null;
 $queryImagen = '';
@@ -41,7 +52,6 @@ try {
         $tipoArchivo = mime_content_type($imagen_nueva['tmp_name']);
         $formatosPermitidos = ['image/jpeg', 'image/png', 'image/gif'];
 
-        // Validar tipo de archivo
         if (!in_array($tipoArchivo, $formatosPermitidos)) {
             echo json_encode(['status' => 'error', 'message' => 'Formato de imagen no permitido']);
             exit;
@@ -50,7 +60,6 @@ try {
         $nombre_imagen = time() . "_" . basename($imagen_nueva['name']);
         $ruta_destino = "../../../uploads/productos/" . $nombre_imagen;
 
-        // Mover la imagen al destino
         if (move_uploaded_file($imagen_nueva['tmp_name'], $ruta_destino)) {
             $queryImagen = ", imagen = :imagen";
             $imagen = $nombre_imagen;
@@ -68,7 +77,8 @@ try {
                   precio = :precio, 
                   stock = :stock, 
                   estado = :estado, 
-                  id_categoria = :id_categoria
+                  id_categoria = :id_categoria, 
+                  slug = :slug
                   $queryImagen
               WHERE id_producto = :id_producto";
 
@@ -82,6 +92,7 @@ try {
     $stmt->bindParam(':stock', $stock);
     $stmt->bindParam(':estado', $estado);
     $stmt->bindParam(':id_categoria', $id_categoria, PDO::PARAM_INT);
+    $stmt->bindParam(':slug', $slug);
     $stmt->bindParam(':id_producto', $id_producto, PDO::PARAM_INT);
 
     if ($imagen) {
@@ -102,6 +113,7 @@ try {
                 'stock' => $stock,
                 'estado' => $estado,
                 'id_categoria' => $id_categoria,
+                'slug' => $slug,
                 'imagen' => $imagen ?? ''
             ]
         ]);

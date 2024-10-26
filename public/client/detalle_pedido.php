@@ -12,7 +12,7 @@ if (!isset($_SESSION['id_cliente'])) {
         'text' => 'Debes iniciar sesión para ver los detalles del pedido.'
     ];
     header("Location: login_cliente.php");
-    exit;
+    exit; 
 }
 
 $id_cliente = $_SESSION['id_cliente'];

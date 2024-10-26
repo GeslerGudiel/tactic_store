@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+Sitemap: https://tactic-store.com/sitemap.xml

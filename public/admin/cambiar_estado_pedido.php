@@ -12,106 +12,122 @@ require('generar_factura.php');
 $database = new Database();
 $db = $database->getConnection();
 
+function enviarCorreo($destinatario, $asunto, $mensaje) {
+    $headers = "From: tactic@store.com\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+    mail($destinatario, $asunto, $mensaje, $headers);
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Sanitizar los datos recibidos
     $id_pedido = htmlspecialchars(strip_tags($_POST['id_pedido']));
     $estado_pedido = htmlspecialchars(strip_tags($_POST['estado_pedido']));
     $estado_pago = htmlspecialchars(strip_tags($_POST['estado_pago']));
 
     try {
-        // Obtener detalles del pedido, cliente y emprendedor
-        $query_detalles = "SELECT p.id_cliente, dp.id_emprendedor, c.correo AS correo_cliente, e.correo AS correo_emprendedor
-                           FROM pedido p
-                           JOIN cliente c ON p.id_cliente = c.id_cliente
-                           JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido
-                           JOIN emprendedor e ON dp.id_emprendedor = e.id_emprendedor
-                           WHERE p.id_pedido = :id_pedido
-                           LIMIT 1";
+        $db->beginTransaction();
+
+        // Obtener estados actuales del pedido y pago
+        $query_estado_actual = "SELECT estado_pedido, pa.estado_pago 
+                                FROM pedido p 
+                                JOIN pago pa ON p.id_pedido = pa.id_pedido 
+                                WHERE p.id_pedido = :id_pedido";
+        $stmt_estado_actual = $db->prepare($query_estado_actual);
+        $stmt_estado_actual->bindParam(':id_pedido', $id_pedido);
+        $stmt_estado_actual->execute();
+        $estado_actual = $stmt_estado_actual->fetch(PDO::FETCH_ASSOC);
+
+        $estado_pedido_actual = $estado_actual['estado_pedido'];
+        $estado_pago_actual = $estado_actual['estado_pago'];
+
+        // Obtener detalles del pedido
+        $query_detalles = "
+            SELECT c.id_cliente, c.correo AS correo_cliente, c.nombre1, c.apellido1,
+                   e.id_emprendedor, e.correo AS correo_emprendedor 
+            FROM pedido p
+            JOIN cliente c ON p.id_cliente = c.id_cliente
+            JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido
+            JOIN emprendedor e ON dp.id_emprendedor = e.id_emprendedor
+            WHERE p.id_pedido = :id_pedido LIMIT 1";
         $stmt_detalles = $db->prepare($query_detalles);
         $stmt_detalles->bindParam(':id_pedido', $id_pedido);
         $stmt_detalles->execute();
         $detalles = $stmt_detalles->fetch(PDO::FETCH_ASSOC);
 
-        // Actualizar el estado del pedido
-        $query_pedido = "UPDATE pedido SET estado_pedido = :estado_pedido WHERE id_pedido = :id_pedido";
-        $stmt_pedido = $db->prepare($query_pedido);
-        $stmt_pedido->bindParam(':estado_pedido', $estado_pedido);
-        $stmt_pedido->bindParam(':id_pedido', $id_pedido);
-        $stmt_pedido->execute();
+        // Obtener productos del pedido
+        $query_productos = "SELECT nombre_producto, cantidad, precio_unitario 
+                            FROM detalle_pedido 
+                            WHERE id_pedido = :id_pedido";
+        $stmt_productos = $db->prepare($query_productos);
+        $stmt_productos->bindParam(':id_pedido', $id_pedido);
+        $stmt_productos->execute();
+        $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
 
-        // Generar la factura si el pedido ha sido entregado
-        if ($estado_pedido == 'Entregado') {
-            $query_pedido = "SELECT * FROM pedido WHERE id_pedido = :id_pedido";
+        $listaProductos = "<ul>";
+        foreach ($productos as $producto) {
+            $listaProductos .= "<li>" . htmlspecialchars($producto['nombre_producto']) .
+                " - Cantidad: " . $producto['cantidad'] .
+                " - Precio Unitario: Q. " . number_format($producto['precio_unitario'], 2) . "</li>";
+        }
+        $listaProductos .= "</ul>";
+
+        // Actualizar estado del pedido
+        if ($estado_pedido !== $estado_pedido_actual) {
+            $query_pedido = "UPDATE pedido SET estado_pedido = :estado_pedido WHERE id_pedido = :id_pedido";
             $stmt_pedido = $db->prepare($query_pedido);
+            $stmt_pedido->bindParam(':estado_pedido', $estado_pedido);
             $stmt_pedido->bindParam(':id_pedido', $id_pedido);
             $stmt_pedido->execute();
-            $pedido = $stmt_pedido->fetch(PDO::FETCH_ASSOC);
 
-            $query_detalle_pedido = "SELECT * FROM detalle_pedido WHERE id_pedido = :id_pedido";
-            $stmt_detalle_pedido = $db->prepare($query_detalle_pedido);
-            $stmt_detalle_pedido->bindParam(':id_pedido', $id_pedido);
-            $stmt_detalle_pedido->execute();
-            $detalles_pedido = $stmt_detalle_pedido->fetchAll(PDO::FETCH_ASSOC);
+            $mensaje_cliente = "
+                <h1>Estado de Pedido Actualizado</h1>
+                <p>El pedido #" . $id_pedido . " ha cambiado a: <strong>" . $estado_pedido . "</strong></p>
+                <h3>Detalles del Pedido:</h3>
+                $listaProductos";
+            enviarCorreo($detalles['correo_cliente'], "Actualización de estado de tu pedido", $mensaje_cliente);
 
-            $total_factura = 0;
-            foreach ($detalles_pedido as $detalle) {
-                $total_factura += isset($detalle['subtotal']) ? $detalle['subtotal'] : $detalle['cantidad'] * $detalle['precio_unitario'];
-            }
+            $mensaje_emprendedor = "El estado del pedido #" . $id_pedido . " ha sido actualizado a: " . $estado_pedido;
+            agregarNotificacion($db, null, $detalles['id_emprendedor'], "Actualización de estado de pedido", strip_tags($mensaje_emprendedor));
+        }
 
-            $query_pago = "SELECT * FROM pago WHERE id_pedido = :id_pedido";
-            $stmt_pago = $db->prepare($query_pago);
-            $stmt_pago->bindParam(':id_pedido', $id_pedido);
-            $stmt_pago->execute();
-            $pago = $stmt_pago->fetch(PDO::FETCH_ASSOC);
+        // Generar factura si el pedido fue entregado
+        if ($estado_pedido == 'Entregado') {
+            $total_factura = array_reduce($productos, function ($total, $producto) {
+                return $total + ($producto['cantidad'] * $producto['precio_unitario']);
+            }, 0);
 
-            $ruta_factura = generarFacturaPDF($pedido, $detalles_pedido, $detalles, $detalles, $pago);
+            $ruta_factura = generarFacturaPDF([], $productos, $detalles, [], []);
 
-            $query_factura = "INSERT INTO factura (id_pedido, fecha_factura, total) VALUES (:id_pedido, NOW(), :total)";
+            $query_factura = "INSERT INTO factura (id_pedido, fecha_factura, total) 
+                              VALUES (:id_pedido, NOW(), :total)";
             $stmt_factura = $db->prepare($query_factura);
             $stmt_factura->bindParam(':id_pedido', $id_pedido);
             $stmt_factura->bindParam(':total', $total_factura);
             $stmt_factura->execute();
-
-            $id_factura = $db->lastInsertId();
-
-            $query_update_pago = "UPDATE pago SET id_factura = :id_factura WHERE id_pedido = :id_pedido";
-            $stmt_update_pago = $db->prepare($query_update_pago);
-            $stmt_update_pago->bindParam(':id_factura', $id_factura);
-            $stmt_update_pago->bindParam(':id_pedido', $id_pedido);
-            $stmt_update_pago->execute();
-
-            $titulo_factura = "Factura disponible para el pedido #" . $id_pedido;
-            $mensaje_factura = "La factura de tu pedido está lista. Puedes descargarla aquí: " . $ruta_factura;
-            agregarNotificacion($db, $detalles['id_cliente'], null, $titulo_factura, $mensaje_factura);
         }
 
-        // Notificar al cliente sobre el cambio de estado del pedido
-        $titulo_pedido = "Actualización de estado de tu pedido";
-        $mensaje_pedido = "El estado de tu pedido #" . $id_pedido . " ha sido actualizado a: " . $estado_pedido;
-        agregarNotificacion($db, $detalles['id_cliente'], null, $titulo_pedido, $mensaje_pedido);
-        agregarNotificacion($db, null, $detalles['id_emprendedor'], $titulo_pedido, $mensaje_pedido);
-
-        // Actualizar el estado del pago
-        if (!empty($estado_pago)) {
+        // Actualizar estado del pago
+        if ($estado_pago !== $estado_pago_actual) {
             $query_pago = "UPDATE pago SET estado_pago = :estado_pago WHERE id_pedido = :id_pedido";
             $stmt_pago = $db->prepare($query_pago);
             $stmt_pago->bindParam(':estado_pago', $estado_pago);
             $stmt_pago->bindParam(':id_pedido', $id_pedido);
             $stmt_pago->execute();
 
-            $titulo_pago_cliente = "Confirmación de Pago";
-            $mensaje_pago_cliente = "El estado del pago para el pedido #" . $id_pedido . " es: " . $estado_pago;
-            agregarNotificacion($db, $detalles['id_cliente'], null, $titulo_pago_cliente, $mensaje_pago_cliente);
+            $mensaje_pago_cliente = "
+                <h1>Estado de Pago Actualizado</h1>
+                <p>El estado del pago de tu pedido #" . $id_pedido . " es: <strong>" . $estado_pago . "</strong></p>";
+            enviarCorreo($detalles['correo_cliente'], "Estado de Pago Actualizado", $mensaje_pago_cliente);
 
-            $titulo_pago_emprendedor = "Pago recibido para el pedido #" . $id_pedido;
-            $mensaje_pago_emprendedor = "El estado del pago de tu pedido ha sido " . strtolower($estado_pago) . ".";
-            agregarNotificacion($db, null, $detalles['id_emprendedor'], $titulo_pago_emprendedor, $mensaje_pago_emprendedor);
+            $mensaje_pago_emprendedor = "El estado del pago para el pedido #" . $id_pedido . " es: " . $estado_pago;
+            agregarNotificacion($db, null, $detalles['id_emprendedor'], "Estado de Pago Actualizado", strip_tags($mensaje_pago_emprendedor));
         }
 
-        // Responder con éxito
-        echo json_encode(['status' => 'success', 'message' => 'El estado del pedido y del pago se han actualizado correctamente.']);
-    } catch (PDOException $e) {
-        echo json_encode(['status' => 'error', 'message' => 'Error al actualizar el estado: ' . $e->getMessage()]);
+        $db->commit();
+        echo json_encode(['status' => 'success', 'message' => 'El estado del pedido y/o pago se ha actualizado correctamente.']);
+    } catch (Exception $e) {
+        $db->rollBack();
+        echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
     }
 } else {
     echo json_encode(['status' => 'error', 'message' => 'Método no permitido.']);

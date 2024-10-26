@@ -69,6 +69,55 @@ if (!$detalles) {
     header("Location: principal_cliente.php");
     exit;
 }
+
+// Enviar correo de confirmación al cliente
+$to = $pedido['correo'];  // Correo del cliente
+$subject = "Confirmación de tu Pedido #" . $pedido['id_pedido'];
+$headers = "From: tienda@miempresa.com\r\n";
+$headers .= "MIME-Version: 1.0\r\n";
+$headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+
+// Crear el contenido del correo
+$message = "<h1>¡Gracias por tu compra, " . htmlspecialchars($pedido['nombre1'] . " " . $pedido['apellido1']) . "!</h1>";
+$message .= "<p>Tu pedido ha sido realizado con éxito. A continuación, te mostramos un resumen de tu pedido:</p>";
+$message .= "<h3>Detalles del Pedido</h3>";
+$message .= "<p><strong>Número de Pedido:</strong> " . htmlspecialchars($pedido['id_pedido']) . "</p>";
+$message .= "<p><strong>Fecha:</strong> " . htmlspecialchars($pedido['fecha_pedido']) . "</p>";
+$message .= "<p><strong>Estado:</strong> " . htmlspecialchars($pedido['estado_pedido']) . "</p>";
+$message .= "<p><strong>Dirección de Envío:</strong> " . htmlspecialchars($pedido['direccion_envio']) . "</p>";
+$message .= "<p><strong>Teléfono de Contacto:</strong> " . htmlspecialchars($pedido['telefono_contacto']) . "</p>";
+
+$message .= "<h3>Productos</h3>";
+$message .= "<table border='1' cellpadding='5' cellspacing='0' style='width:100%; border-collapse: collapse;'>";
+$message .= "<thead><tr><th>Producto</th><th>Cantidad</th><th>Precio Unitario</th><th>Subtotal</th></tr></thead>";
+$message .= "<tbody>";
+
+$total = 0;
+foreach ($detalles as $detalle) {
+    $message .= "<tr>";
+    $message .= "<td>" . htmlspecialchars($detalle['nombre_producto']) . "</td>";
+    $message .= "<td>" . htmlspecialchars($detalle['cantidad']) . "</td>";
+    $message .= "<td>Q. " . number_format($detalle['precio_unitario'], 2) . "</td>";
+    $message .= "<td>Q. " . number_format($detalle['subtotal'], 2) . "</td>";
+    $message .= "</tr>";
+    $total += $detalle['subtotal'];
+}
+
+$message .= "</tbody></table>";
+$message .= "<h3>Total: Q. " . number_format($total, 2) . "</h3>";
+
+// Enviar el correo
+if (mail($to, $subject, $message, $headers)) {
+    $_SESSION['message'] = [
+        'type' => 'success',
+        'text' => 'Correo de confirmación enviado correctamente.'
+    ];
+} else {
+    $_SESSION['message'] = [
+        'type' => 'error',
+        'text' => 'No se pudo enviar el correo de confirmación.'
+    ];
+}
 ?>
 
 <?php

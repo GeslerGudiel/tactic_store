@@ -7,6 +7,12 @@ if (!isset($_SESSION['id_emprendedor']) || $_SESSION['usuario_rol'] !== 'emprend
 
 include_once '../../../src/config/database.php';
 
+// Función para generar un slug del nombre del producto
+function generarSlug($cadena) {
+    $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $cadena)));
+    return $slug;
+}
+
 $database = new Database();
 $db = $database->getConnection();
 
@@ -20,12 +26,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Validar y sanitizar los datos del producto
 $nombre_producto = htmlspecialchars(strip_tags($_POST['nombre_producto']));
+$slug = generarSlug($nombre_producto);  // Generar slug para URL amigable
 $descripcion = htmlspecialchars(strip_tags($_POST['descripcion']));
 $costo = filter_var($_POST['costo'], FILTER_VALIDATE_FLOAT);
 $precio = filter_var($_POST['precio'], FILTER_VALIDATE_FLOAT);
 $stock = filter_var($_POST['stock'], FILTER_VALIDATE_INT);
 $estado = htmlspecialchars(strip_tags($_POST['estado']));
 $id_categoria = filter_var($_POST['id_categoria'], FILTER_VALIDATE_INT);
+
+// Metadatos adicionales (opcional para SEO)
+$meta_title = isset($_POST['meta_title']) ? htmlspecialchars(strip_tags($_POST['meta_title'])) : $nombre_producto;
+$meta_description = isset($_POST['meta_description']) ? htmlspecialchars(strip_tags($_POST['meta_description'])) : substr($descripcion, 0, 160);
 
 // Si el stock es 0, forzar el estado a "No disponible"
 if ($stock == 0) {
@@ -55,6 +66,7 @@ if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
     // Mover la imagen al directorio de destino
     if (move_uploaded_file($_FILES['imagen']['tmp_name'], $ruta_destino)) {
         $imagen = $nombre_imagen;
+        $imagen_alt = htmlspecialchars(strip_tags($_POST['imagen_alt'] ?? $nombre_producto));
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Error al subir la imagen']);
         exit;
@@ -64,24 +76,28 @@ if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
     exit;
 }
 
-// Preparar la consulta SQL para insertar el producto
+// Preparar la consulta SQL para insertar el producto con datos SEO
 $query = "INSERT INTO producto 
-          (id_negocio, nombre_producto, descripcion, costo, precio, stock, imagen, estado, id_categoria, id_emprendedor) 
+          (id_negocio, nombre_producto, slug, descripcion, costo, precio, stock, imagen, imagen_alt, estado, id_categoria, id_emprendedor, meta_title, meta_description) 
           VALUES 
-          (:id_negocio, :nombre_producto, :descripcion, :costo, :precio, :stock, :imagen, :estado, :id_categoria, :id_emprendedor)";
+          (:id_negocio, :nombre_producto, :slug, :descripcion, :costo, :precio, :stock, :imagen, :imagen_alt, :estado, :id_categoria, :id_emprendedor, :meta_title, :meta_description)";
 
 $stmt = $db->prepare($query);
 
 $stmt->bindParam(':id_negocio', $id_negocio);
 $stmt->bindParam(':nombre_producto', $nombre_producto);
+$stmt->bindParam(':slug', $slug);
 $stmt->bindParam(':descripcion', $descripcion);
 $stmt->bindParam(':costo', $costo);
 $stmt->bindParam(':precio', $precio);
 $stmt->bindParam(':stock', $stock);
 $stmt->bindParam(':imagen', $imagen);
+$stmt->bindParam(':imagen_alt', $imagen_alt);
 $stmt->bindParam(':estado', $estado);
 $stmt->bindParam(':id_categoria', $id_categoria);
 $stmt->bindParam(':id_emprendedor', $id_emprendedor);
+$stmt->bindParam(':meta_title', $meta_title);
+$stmt->bindParam(':meta_description', $meta_description);
 
 // Ejecutar la consulta e informar el resultado
 try {

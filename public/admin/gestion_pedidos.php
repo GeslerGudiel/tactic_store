@@ -8,7 +8,7 @@ if (!isset($_SESSION['usuario_rol']) || ($_SESSION['usuario_rol'] !== 'administr
 include_once '../../src/config/database.php';
 
 $database = new Database();
-$db = $database->getConnection();
+$db = $database->getConnection(); 
 
 // Obtener el mes y el estado seleccionados del formulario
 $mes_seleccionado = isset($_GET['mes_seleccionado']) ? $_GET['mes_seleccionado'] : date('m');

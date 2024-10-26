@@ -21,7 +21,7 @@ function procesarPago($db, $id_pedido, $metodo_pago) {
     $stmt_pago->bindParam(':estado_pago', $estado_pago);
     $stmt_pago->execute();
 
-    $id_pago = $db->lastInsertId();
+    $id_pago = $db->lastInsertId(); 
 
     // Manejo del archivo de comprobante para depósito bancario
     if ($metodo_pago === 'deposito_bancario') {

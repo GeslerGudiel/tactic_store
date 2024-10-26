@@ -14,33 +14,48 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $telefono1 = htmlspecialchars(strip_tags($_POST['telefono1']));
     $telefono2 = htmlspecialchars(strip_tags($_POST['telefono2']));
     $id_direccion = htmlspecialchars(strip_tags($_POST['id_direccion']));
-    $token_activacion = bin2hex(random_bytes(50)); // Genera un token único para la activación
+    $token_activacion = bin2hex(random_bytes(50)); // Token único
     $fecha_creacion = date("Y-m-d H:i:s");
 
     // Validar que las contraseñas coincidan
     if ($contrasena !== $confirmar_contrasena) {
         $_SESSION['message'] = [
             'type' => 'error',
-            'text' => 'Las contraseñas no coinciden. Por favor, inténtelo de nuevo.'
+            'text' => 'Las contraseñas no coinciden. Inténtalo de nuevo.'
         ];
         header("Location: register_cliente.php");
         exit;
     }
 
-    // Hashear la contraseña antes de almacenarla en la base de datos
+    // Hashear la contraseña antes de almacenarla
     $hashed_password = password_hash($contrasena, PASSWORD_DEFAULT);
 
     try {
         $database = new Database();
         $db = $database->getConnection();
 
-        // Manejar la creación de una nueva dirección si es necesario
+        // Validación: Verificar si el NIT o correo ya existen
+        $query_check = "SELECT id_cliente FROM cliente WHERE NIT = :NIT OR correo = :correo";
+        $stmt_check = $db->prepare($query_check);
+        $stmt_check->bindParam(':NIT', $NIT);
+        $stmt_check->bindParam(':correo', $correo);
+        $stmt_check->execute();
+
+        if ($stmt_check->rowCount() > 0) {
+            $_SESSION['message'] = [
+                'type' => 'error',
+                'text' => 'El NIT o correo ya están registrados. Por favor, utiliza uno diferente.'
+            ];
+            header("Location: register_cliente.php");
+            exit;
+        }
+
+        // Manejar la creación de una nueva dirección
         if (isset($_POST['agregar_direccion']) && $_POST['agregar_direccion'] === 'on') {
             $departamento = htmlspecialchars(strip_tags($_POST['departamento']));
             $municipio = htmlspecialchars(strip_tags($_POST['municipio']));
             $localidad = htmlspecialchars(strip_tags($_POST['localidad']));
 
-            // Insertar la nueva dirección en la base de datos
             $query_direccion = "INSERT INTO direccion (departamento, municipio, localidad) 
                                 VALUES (:departamento, :municipio, :localidad)";
             $stmt_direccion = $db->prepare($query_direccion);
@@ -49,14 +64,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt_direccion->bindParam(':localidad', $localidad);
             $stmt_direccion->execute();
 
-            // Obtener el ID de la nueva dirección
             $id_direccion = $db->lastInsertId();
         }
 
-        // Insertar datos del cliente en la base de datos
-        $query = "INSERT INTO cliente (NIT, nombre1, nombre2, apellido1, apellido2, correo, contrasena, telefono1, telefono2, id_direccion, token_activacion, fecha_creacion) 
-                  VALUES (:NIT, :nombre1, :nombre2, :apellido1, :apellido2, :correo, :contrasena, :telefono1, :telefono2, :id_direccion, :token_activacion, :fecha_creacion)";
-
+        // Insertar los datos del cliente
+        $query = "INSERT INTO cliente 
+                  (NIT, nombre1, nombre2, apellido1, apellido2, correo, contrasena, telefono1, telefono2, id_direccion, token_activacion, fecha_creacion) 
+                  VALUES 
+                  (:NIT, :nombre1, :nombre2, :apellido1, :apellido2, :correo, :contrasena, :telefono1, :telefono2, :id_direccion, :token_activacion, :fecha_creacion)";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':NIT', $NIT);
         $stmt->bindParam(':nombre1', $nombre1);
@@ -72,27 +87,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->bindParam(':fecha_creacion', $fecha_creacion);
 
         if ($stmt->execute()) {
-            $_SESSION['message'] = [
-                'type' => 'success',
-                'text' => 'Registro exitoso. Por favor, revise su correo electrónico para activar su cuenta.'
-            ];
-            header("Location: principal_cliente.php");
-            exit;
+            // Enviar correo de activación
+            $activation_link = "http://localhost/comercio_electronico/public/client/activate_cliente.php?token=" . $token_activacion;
+            $to = $correo;
+            $subject = "Activa tu cuenta";
+            $message = "Hola $nombre1,\n\nHaz clic en el siguiente enlace para activar tu cuenta:\n$activation_link";
+            $headers = "From: no-reply@tacticstore.com";
+
+            if (mail($to, $subject, $message, $headers)) {
+                $_SESSION['message'] = [
+                    'type' => 'success',
+                    'text' => 'Registro exitoso. Revisa tu correo para activar tu cuenta.'
+                ];
+                header("Location: principal_cliente.php");
+            } else {
+                $_SESSION['message'] = [
+                    'type' => 'warning',
+                    'text' => 'Registro exitoso, pero hubo un problema al enviar el correo de activación.'
+                ];
+                header("Location: register_cliente.php");
+            }
         } else {
             $_SESSION['message'] = [
                 'type' => 'error',
-                'text' => 'Hubo un problema al registrarse. Por favor, inténtelo de nuevo más tarde.'
+                'text' => 'Hubo un problema al registrarse. Inténtalo de nuevo.'
             ];
             header("Location: register_cliente.php");
-            exit;
         }
-
     } catch (PDOException $e) {
         $_SESSION['message'] = [
             'type' => 'error',
             'text' => 'Error: ' . $e->getMessage()
         ];
         header("Location: register_cliente.php");
-        exit;
     }
 }

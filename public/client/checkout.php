@@ -5,7 +5,6 @@ session_start();
 $loggedIn = isset($_SESSION['id_cliente']);
 
 if (!$loggedIn) {
-    // Si el cliente no está conectado, redirigir a la página de inicio de sesión
     $_SESSION['message'] = [
         'type' => 'warning',
         'text' => 'Debes iniciar sesión para proceder al pago.'
@@ -22,7 +21,6 @@ $db = $database->getConnection();
 $productos_en_carrito = isset($_SESSION['carrito']) ? $_SESSION['carrito'] : [];
 
 if (empty($productos_en_carrito)) {
-    // Si el carrito está vacío, redirigir al cliente a la página principal
     $_SESSION['message'] = [
         'type' => 'warning',
         'text' => 'Tu carrito está vacío. Agrega productos antes de proceder al pago.'
@@ -31,10 +29,9 @@ if (empty($productos_en_carrito)) {
     exit;
 }
 
-// Verificar si hay mensajes en la sesión para mostrar
 if (isset($_SESSION['message'])) {
     $message = $_SESSION['message'];
-    unset($_SESSION['message']); // Eliminar el mensaje después de mostrarlo
+    unset($_SESSION['message']);
 }
 ?>
 
@@ -51,22 +48,16 @@ if (isset($_SESSION['message'])) {
         body {
             background-color: #f8f9fa;
         }
-
         .navbar {
             background-color: #343a40;
             color: white;
         }
-
-        .navbar-brand,
-        .nav-link {
+        .navbar-brand, .nav-link {
             color: white;
         }
-
-        .navbar-brand:hover,
-        .nav-link:hover {
+        .navbar-brand:hover, .nav-link:hover {
             color: #ffc107;
         }
-
         .container {
             margin-top: 20px;
         }
@@ -78,29 +69,20 @@ if (isset($_SESSION['message'])) {
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="principal_cliente.php">Tienda Virtual</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="principal_cliente.php">Inicio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="principal_cliente.php">Productos</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="principal_cliente.php">Categorías</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="logout_cliente.php">Cerrar Sesión</a>
-                    </li>
+                    <li class="nav-item"><a class="nav-link" href="principal_cliente.php">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link" href="principal_cliente.php">Productos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="principal_cliente.php">Categorías</a></li>
+                    <li class="nav-item"><a class="nav-link" href="logout_cliente.php">Cerrar Sesión</a></li>
                     <li class="nav-item">
                         <a class="nav-link" href="carrito.php">
-                            <i class="fas fa-shopping-cart"></i>
-                            Carrito
+                            <i class="fas fa-shopping-cart"></i> Carrito
                             <span class="badge bg-danger" id="cart-count">
-                                <?php echo isset($_SESSION['carrito']) ? array_sum(array_column($_SESSION['carrito'], 'cantidad')) : 0; ?>
+                                <?php echo array_sum(array_column($_SESSION['carrito'], 'cantidad')); ?>
                             </span>
                         </a>
                     </li>
@@ -126,20 +108,31 @@ if (isset($_SESSION['message'])) {
                 <?php
                 $total_carrito = 0;
                 foreach ($productos_en_carrito as $id_producto => $detalle):
-                    // Obtener información del producto desde la base de datos
-                    $query = "SELECT nombre_producto, precio FROM producto WHERE id_producto = :id_producto";
+                    // Consulta para obtener información del producto y la promoción activa (si existe)
+                    $query = "
+                        SELECT p.nombre_producto, 
+                               p.precio, 
+                               pr.precio_oferta 
+                        FROM producto p
+                        LEFT JOIN promocion pr 
+                            ON p.id_producto = pr.id_producto 
+                            AND pr.estado = 'Activo' 
+                            AND pr.fecha_fin >= CURDATE()
+                        WHERE p.id_producto = :id_producto";
                     $stmt = $db->prepare($query);
                     $stmt->bindParam(':id_producto', $id_producto);
                     $stmt->execute();
                     $producto = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if ($producto):
-                        $total_producto = $producto['precio'] * $detalle['cantidad'];
+                        // Usar el precio promocional si está activo; de lo contrario, el precio regular
+                        $precio_unitario = $producto['precio_oferta'] ?? $producto['precio'];
+                        $total_producto = $precio_unitario * $detalle['cantidad'];
                         $total_carrito += $total_producto;
                 ?>
                         <tr>
                             <td><?php echo htmlspecialchars($producto['nombre_producto']); ?></td>
-                            <td>Q. <?php echo number_format($producto['precio'], 2); ?></td>
+                            <td>Q. <?php echo number_format($precio_unitario, 2); ?></td>
                             <td><?php echo $detalle['cantidad']; ?></td>
                             <td>Q. <?php echo number_format($total_producto, 2); ?></td>
                         </tr>
@@ -161,7 +154,7 @@ if (isset($_SESSION['message'])) {
             <div class="mb-3">
                 <label for="telefono_contacto" class="form-label">Teléfono de Contacto</label>
                 <input type="text" class="form-control" id="telefono_contacto" name="telefono_contacto" required>
-            </div>
+            </div> 
 
             <h3>Método de Pago</h3>
             <div class="mb-3">
@@ -176,19 +169,15 @@ if (isset($_SESSION['message'])) {
                 <h5>Información para Depósito Bancario:</h5>
                 <p>Banco: Banco Ejemplo</p>
                 <p>Número de cuenta: 123456789</p>
-                <p>Nombre de la cuenta: Nombre Ejemplo</p>
-                <p>Tipo de cuenta: Ahorro</p>
-                <p>Por favor, realiza el depósito y sube el comprobante a continuación.</p>
+                <p>Por favor, sube el comprobante a continuación.</p>
 
                 <div class="mb-3">
-                    <label for="imagen_comprobante" class="form-label">Subir Comprobante de Depósito:</label>
+                    <label for="imagen_comprobante" class="form-label">Subir Comprobante:</label>
                     <input class="form-control" type="file" id="imagen_comprobante" name="imagen_comprobante" accept="image/*">
                 </div>
-                <div class="mb-3 form-check">
+                <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="subir_despues" name="subir_despues">
-                    <label class="form-check-label" for="subir_despues">
-                        Subir comprobante después
-                    </label>
+                    <label class="form-check-label" for="subir_despues">Subir comprobante después</label>
                 </div>
             </div>
 
@@ -201,13 +190,8 @@ if (isset($_SESSION['message'])) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.getElementById('metodo_pago').addEventListener('change', function() {
-            var metodo = this.value;
             var informacionBancaria = document.getElementById('informacion_bancaria');
-            if (metodo === 'deposito_bancario') {
-                informacionBancaria.style.display = 'block';
-            } else {
-                informacionBancaria.style.display = 'none';
-            }
+            informacionBancaria.style.display = this.value === 'deposito_bancario' ? 'block' : 'none';
         });
     </script>
 
@@ -225,5 +209,4 @@ if (isset($_SESSION['message'])) {
     <?php endif; ?>
 
 </body>
-
 </html>

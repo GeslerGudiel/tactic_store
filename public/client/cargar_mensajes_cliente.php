@@ -5,7 +5,7 @@ include_once '../../src/config/database.php';
 // Verificar si el cliente está conectado
 if (!isset($_SESSION['id_cliente'])) {
     echo json_encode(['error' => 'No autorizado']);
-    exit;
+    exit; 
 }
 
 $id_cliente = $_SESSION['id_cliente'];

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,27 +12,34 @@
             max-width: 600px;
             margin-top: 50px;
         }
+
         h2 {
             margin-bottom: 30px;
         }
+
         .form-label {
             font-weight: bold;
         }
+
         .form-label i {
             margin-right: 5px;
             color: #007bff;
         }
+
         .btn-primary {
             background-color: #007bff;
             border-color: #007bff;
         }
+
         .btn-primary:hover {
             background-color: #0056b3;
             border-color: #0056b3;
         }
+
         .input-group-text {
             cursor: pointer;
         }
+
         .alert-floating {
             position: fixed;
             top: 20px;
@@ -42,6 +50,7 @@
             border-radius: 5px;
             opacity: 0.9;
         }
+
         #nueva_direccion_form {
             display: none;
             border: 1px solid #ddd;
@@ -52,6 +61,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h2 class="text-center"><i class="fas fa-user-plus"></i> Registro de Cliente</h2>
@@ -85,6 +95,7 @@
             <div class="mb-3">
                 <label for="NIT" class="form-label"><i class="fas fa-id-card"></i> NIT:</label>
                 <input type="text" id="NIT" name="NIT" class="form-control" placeholder="Ingrese su NIT" required>
+                <div class="invalid-feedback">Este NIT ya está registrado.</div>
             </div>
             <div class="row">
                 <div class="mb-3 col-md-6">
@@ -106,9 +117,11 @@
                     <input type="text" id="apellido2" name="apellido2" class="form-control" placeholder="Ingrese su segundo apellido">
                 </div>
             </div>
+
             <div class="mb-3">
                 <label for="correo" class="form-label"><i class="fas fa-envelope"></i> Correo Electrónico:</label>
                 <input type="email" id="correo" name="correo" class="form-control" placeholder="Ingrese su correo electrónico" required>
+                <div class="invalid-feedback">Este correo ya está registrado.</div>
             </div>
             <div class="row">
                 <div class="mb-3 col-md-6">
@@ -175,14 +188,14 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         // Mostrar/ocultar contraseña
-        document.getElementById('toggle-password').addEventListener('click', function () {
+        document.getElementById('toggle-password').addEventListener('click', function() {
             const passwordField = document.getElementById('contrasena');
             const passwordFieldType = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordField.setAttribute('type', passwordFieldType);
             this.querySelector('i').classList.toggle('fa-eye-slash');
         });
 
-        document.getElementById('toggle-confirm-password').addEventListener('click', function () {
+        document.getElementById('toggle-confirm-password').addEventListener('click', function() {
             const confirmPasswordField = document.getElementById('confirmar_contrasena');
             const confirmPasswordFieldType = confirmPasswordField.getAttribute('type') === 'password' ? 'text' : 'password';
             confirmPasswordField.setAttribute('type', confirmPasswordFieldType);
@@ -190,10 +203,41 @@
         });
 
         // Mostrar el formulario de nueva dirección si se marca el checkbox
-        document.getElementById('agregar_direccion').addEventListener('change', function () {
+        document.getElementById('agregar_direccion').addEventListener('change', function() {
             const nuevaDireccionForm = document.getElementById('nueva_direccion_form');
             nuevaDireccionForm.style.display = this.checked ? 'block' : 'none';
         });
+
+        // Validación AJAX para verificar si el NIT ya está registrado
+        document.getElementById('NIT').addEventListener('blur', function() {
+            const nitInput = this;
+            fetch(`verificar_cliente.php?NIT=${nitInput.value}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        nitInput.classList.add('is-invalid');
+                    } else {
+                        nitInput.classList.remove('is-invalid');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        // Validación AJAX para verificar si el correo ya está registrado
+        document.getElementById('correo').addEventListener('blur', function() {
+            const emailInput = this;
+            fetch(`verificar_cliente.php?correo=${emailInput.value}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        emailInput.classList.add('is-invalid');
+                    } else {
+                        emailInput.classList.remove('is-invalid');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
     </script>
 </body>
+
 </html>

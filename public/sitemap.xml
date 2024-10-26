@@ -1,0 +1,78 @@
+<?php
+// Asegúrate de que no haya espacios en blanco antes de esta línea
+
+// Configurar la cabecera para que el navegador sepa que es un XML
+header("Content-Type: application/xml; charset=UTF-8");
+
+// Incluir la conexión a la base de datos
+include_once '../../src/config/database.php';
+
+$database = new Database();
+$db = $database->getConnection();
+
+// Crear el inicio del XML
+echo '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL;
+echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . PHP_EOL;
+
+// Agregar la página principal de la tienda
+echo '<url>';
+//echo '<loc>https://tactic-store.com/</loc>';
+echo '<loc>http://localhost/comercio_electronico/public/client/principal_cliente.php/</loc>';
+echo '<lastmod>' . date('Y-m-d') . '</lastmod>';
+echo '<changefreq>daily</changefreq>';
+echo '<priority>1.0</priority>';
+echo '</url>' . PHP_EOL;
+
+// Obtener todas las categorías
+$queryCategorias = "SELECT id_categoria, nombre_categoria FROM categoria";
+$stmtCategorias = $db->prepare($queryCategorias);
+$stmtCategorias->execute();
+$categorias = $stmtCategorias->fetchAll(PDO::FETCH_ASSOC);
+
+// Generar URLs para las categorías
+foreach ($categorias as $categoria) {
+    $slug_categoria = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $categoria['nombre_categoria']));
+    echo '<url>';
+    echo '<loc>https://tactic-store.com/categoria/' . $slug_categoria . '</loc>';
+    echo '<lastmod>' . date('Y-m-d') . '</lastmod>';
+    echo '<changefreq>weekly</changefreq>';
+    echo '<priority>0.8</priority>';
+    echo '</url>' . PHP_EOL;
+}
+
+// Obtener todos los productos
+$queryProductos = "SELECT id_producto, nombre_producto FROM producto WHERE estado = 'disponible'";
+$stmtProductos = $db->prepare($queryProductos);
+$stmtProductos->execute();
+$productos = $stmtProductos->fetchAll(PDO::FETCH_ASSOC);
+
+// Generar URLs para los productos
+foreach ($productos as $producto) {
+    $slug_producto = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $producto['nombre_producto']));
+    echo '<url>';
+    echo '<loc>https://tactic-store.com/producto/' . $slug_producto . '</loc>';
+    echo '<lastmod>' . date('Y-m-d') . '</lastmod>';
+    echo '<changefreq>weekly</changefreq>';
+    echo '<priority>0.9</priority>';
+    echo '</url>' . PHP_EOL;
+}
+
+// Agregar otras páginas estáticas de tu sitio
+$pages = [
+    'https://tactic-store.com/nosotros',
+    'https://tactic-store.com/terminos',
+    'https://tactic-store.com/contacto'
+];
+
+foreach ($pages as $page) {
+    echo '<url>';
+    echo '<loc>' . $page . '</loc>';
+    echo '<lastmod>' . date('Y-m-d') . '</lastmod>';
+    echo '<changefreq>monthly</changefreq>';
+    echo '<priority>0.5</priority>';
+    echo '</url>' . PHP_EOL;
+}
+
+// Cerrar el XML
+echo '</urlset>';
+?>

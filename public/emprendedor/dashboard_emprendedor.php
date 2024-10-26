@@ -1,31 +1,35 @@
 <?php
 session_start();
 
+// Verificar inactividad y destruir la sesión si ha pasado más de 30 minutos
 if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > 1800)) {
-    // Si la última actividad fue hace más de 30 minutos
-    session_unset();
-    session_destroy();
+    session_unset();  // Elimina todas las variables de sesión
+    session_destroy(); // Destruye la sesión
     header("Location: ../auth/login.php");
     exit;
 }
-$_SESSION['LAST_ACTIVITY'] = time(); // Se actualiza el timestamp
+$_SESSION['LAST_ACTIVITY'] = time(); // Actualiza el timestamp de la actividad
 
-// Verificar si el usuario tiene rol de emprendedor
+// Verificar si el usuario tiene rol de emprendedor y está autenticado
 if (!isset($_SESSION['id_emprendedor']) || $_SESSION['usuario_rol'] !== 'emprendedor') {
     header("Location: ../auth/login.php");
     exit;
 }
 
+// Obtener el estado del emprendedor desde la sesión
+$estado_emprendedor = $_SESSION['estado_emprendedor'] ?? null; // Manejar posibles valores nulos
+
+// Mostrar un mensaje si existe en la sesión
 if (isset($_SESSION['message'])) {
     echo "<script>
     Swal.fire({
-        icon: 'success',
+        icon: '" . ($_SESSION['message']['type'] ?? 'info') . "',
         title: 'Atención',
-        text: '" . $_SESSION['message'] . "',
+        text: '" . ($_SESSION['message']['text'] ?? '') . "',
         confirmButtonText: 'Aceptar'
     });
     </script>";
-    unset($_SESSION['message']);
+    unset($_SESSION['message']); // Eliminar mensaje después de mostrarlo
 }
 ?>
 
@@ -158,58 +162,70 @@ if (isset($_SESSION['message'])) {
             <i class="fas fa-user"></i> <span>Mi Perfil</span>
         </a>
 
-        <a href="#" class="nav-link" id="ver-productos-link">
-            <i class="fas fa-box"></i> <span>Ver Productos</span>
-        </a>
+        <?php if ($estado_emprendedor != 3): // Si no está 'Pendiente de Validación' 
+        ?>
+            <a href="#" class="nav-link" id="ver-productos-link">
+                <i class="fas fa-box"></i> <span>Ver Productos</span>
+            </a>
 
-        <a href="#" class="nav-link" id="ver-pedidos-link">
-            <i class="fas fa-shopping-basket"></i> <span>Ver Pedidos</span>
-        </a>
+            <a href="#" class="nav-link" id="promocion-link">
+                <i class="fa-solid fa-percent"></i> <span>Promociones</span>
+            </a>
 
-        <!-- Menú desplegable de Ventas Locales -->
-        <a href="#" class="nav-link" data-bs-toggle="collapse" data-bs-target="#productos-submenu" aria-expanded="false" aria-controls="productos-submenu">
-            <i class="fa-solid fa-cart-arrow-down"></i> <span>Ventas Locales</span> <i class="fas fa-caret-down float-end"></i>
-        </a>
-        <div class="collapse" id="productos-submenu">
-            <ul class="nav flex-column ms-3">
-                <li class="nav-item">
-                    <a href="#" class="nav-link" id="ventas-locales-link">
-                        <i class="fas fa-shopping-cart"></i> <span>Registrar Venta</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" id="historial-ventas-locales-link">
-                        <i class="fas fa-history"></i> <span>Historial de Ventas</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" id="analisis-ventas-locales-link">
-                        <i class="fas fa-chart-bar"></i> <span>Análisis de Ventas Locales</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+            <a href="#" class="nav-link" id="ver-pedidos-link">
+                <i class="fas fa-shopping-basket"></i> <span>Ver Pedidos</span>
+            </a>
 
-        <a href="#" class="nav-link" id="estado-cuenta-link">
-            <i class="fas fa-wallet"></i> <span>Estado De Cuenta</span>
-        </a>
+            <!-- Menú desplegable de Ventas Locales -->
+            <a href="#" class="nav-link" data-bs-toggle="collapse" data-bs-target="#productos-submenu" aria-expanded="false" aria-controls="productos-submenu">
+                <i class="fa-solid fa-cart-arrow-down"></i> <span>Ventas Locales</span> <i class="fas fa-caret-down float-end"></i>
+            </a>
+            <div class="collapse" id="productos-submenu">
+                <ul class="nav flex-column ms-3">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" id="clientes-emprendedor-link">
+                            <i class="fa-solid fa-users"></i> <span>Mis Clientes</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" id="ventas-locales-link">
+                            <i class="fas fa-shopping-cart"></i> <span>Registrar Venta</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" id="historial-ventas-locales-link">
+                            <i class="fas fa-history"></i> <span>Historial de Ventas</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" id="analisis-ventas-locales-link">
+                            <i class="fas fa-chart-bar"></i> <span>Análisis de Ventas Locales</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
 
-        <a href="#" class="nav-link" id="comentario-link">
-            <i class="fas fa-comment"></i> <span>Comentarios</span>
-        </a>
+            <a href="#" class="nav-link" id="estado-cuenta-link">
+                <i class="fas fa-wallet"></i> <span>Estado De Cuenta</span>
+            </a>
 
-        <a href="#" class="nav-link" id="inventario-link">
-            <i class="fas fa-boxes"></i> <span>Inventario</span>
-        </a>
+            <a href="#" class="nav-link" id="comentario-link">
+                <i class="fas fa-comment"></i> <span>Comentarios</span>
+            </a>
 
-        <a href="#" class="nav-link" id="reportes-link">
-            <i class="fas fa-chart-line"></i> <span>Ver Reportes</span>
-        </a>
+            <a href="#" class="nav-link" id="inventario-link">
+                <i class="fas fa-boxes"></i> <span>Inventario</span>
+            </a>
 
-        <a href="#" class="nav-link" id="analisis-ventas-link">
-            <i class="fas fa-chart-line"></i> <span>Analisis de Ventas</span>
-        </a>
+            <a href="#" class="nav-link" id="reportes-link">
+                <i class="fas fa-chart-line"></i> <span>Ver Reportes</span>
+            </a>
 
+            <a href="#" class="nav-link" id="analisis-ventas-link">
+                <i class="fas fa-chart-line"></i> <span>Analisis de Ventas</span>
+            </a>
+        <?php endif; ?>
+            
         <a href="logout.php" class="nav-link">
             <i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span>
         </a>
@@ -326,6 +342,12 @@ if (isset($_SESSION['message'])) {
                 });
             });
 
+            $('#promocion-link').click(function(e) {
+                e.preventDefault();
+                $('#content-area').load('/comercio_electronico/public/emprendedor/promocion/gestionar_promociones.php');
+                activarOpcion('#promocion-link');
+            });
+
             $('#ver-productos-link').click(function(e) {
                 e.preventDefault();
                 $('#content-area').load('/comercio_electronico/public/emprendedor/producto/productos.php');
@@ -336,6 +358,12 @@ if (isset($_SESSION['message'])) {
                 e.preventDefault();
                 $('#content-area').load('/comercio_electronico/public/emprendedor/pedido/ver_pedidos.php');
                 activarOpcion('#ver-pedidos-link');
+            });
+
+            $('#clientes-emprendedor-link').click(function(e) {
+                e.preventDefault();
+                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/ver_clientes.php');
+                activarOpcion('#clientes-emprendedor-link');
             });
 
             $('#ventas-locales-link').click(function(e) {

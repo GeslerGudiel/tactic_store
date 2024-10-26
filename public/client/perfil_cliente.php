@@ -8,7 +8,7 @@ $db = $database->getConnection();
 // Verificar si el cliente está conectado
 if (!isset($_SESSION['id_cliente'])) {
     $_SESSION['message'] = [
-        'type' => 'warning',
+        'type' => 'warning', 
         'text' => 'Debes iniciar sesión para acceder a tu perfil.'
     ];
     header("Location: login_cliente.php");

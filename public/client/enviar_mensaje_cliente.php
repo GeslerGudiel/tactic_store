@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (move_uploaded_file($_FILES['imagen']['tmp_name'], $rutaDestino)) {
             $imagen = $nombreImagen;  // Si se cargó correctamente, se asigna el nombre
-        }
+        } 
     }
 
     // Obtener el id del cliente desde la sesión

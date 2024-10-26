@@ -72,7 +72,19 @@ try {
         foreach ($_SESSION['carrito'] as $id_producto => $detalle) {
             echo "Paso 4: Procesando producto ID $id_producto<br>";
 
-            $query_producto = "SELECT p.nombre_producto, p.precio, p.stock, p.id_emprendedor FROM producto p WHERE id_producto = :id_producto FOR UPDATE";
+            $query_producto = "
+            SELECT p.nombre_producto, 
+                   p.precio, 
+                   p.stock, 
+                   p.id_emprendedor, 
+                   pr.precio_oferta 
+            FROM producto p
+            LEFT JOIN promocion pr 
+                ON p.id_producto = pr.id_producto 
+                AND pr.estado = 'Activo' 
+                AND pr.fecha_fin >= CURDATE()
+            WHERE p.id_producto = :id_producto
+            FOR UPDATE";
             $stmt_producto = $db->prepare($query_producto);
             $stmt_producto->bindParam(':id_producto', $id_producto);
             $stmt_producto->execute();
@@ -83,7 +95,7 @@ try {
             }
 
             $nombre_producto = $producto['nombre_producto'];
-            $precio_unitario = $producto['precio'];
+            $precio_unitario = $producto['precio_oferta'] ?? $producto['precio'];
             $cantidad = $detalle['cantidad'];
             $subtotal = $precio_unitario * $cantidad;
             $id_emprendedor = $producto['id_emprendedor'];  // Obtener el id_emprendedor
@@ -113,9 +125,60 @@ try {
                 agregarNotificacion($db, null, $id_emprendedor, $titulo, $mensaje);
             }
 
+            // Obtener el precio original del producto
+            $query_precio_original = "
+                SELECT nombre_producto, precio, id_emprendedor, stock 
+                FROM producto 
+                WHERE id_producto = :id_producto FOR UPDATE";
+
+            $stmt_precio_original = $db->prepare($query_precio_original);
+            $stmt_precio_original->bindParam(':id_producto', $id_producto);
+            $stmt_precio_original->execute();
+            $producto = $stmt_precio_original->fetch(PDO::FETCH_ASSOC);
+
+            if (!$producto) {
+                throw new Exception("Producto no encontrado: ID $id_producto");
+            }
+
+            $precio_original = $producto['precio'];  // Precio base del producto
+            $id_emprendedor = $producto['id_emprendedor'];
+
+            // Verificar si hay promoción activa para el producto
+            $query_promocion = "
+                SELECT precio_oferta 
+                FROM promocion 
+                WHERE id_producto = :id_producto 
+                AND estado = 'Activo' 
+                AND fecha_fin >= CURDATE()
+                ";
+            $stmt_promocion = $db->prepare($query_promocion);
+            $stmt_promocion->bindParam(':id_producto', $id_producto);
+            $stmt_promocion->execute();
+            $promocion = $stmt_promocion->fetch(PDO::FETCH_ASSOC);
+
+            if ($promocion) {
+                // Si hay promoción, usar el precio de oferta
+                $precio_unitario = $promocion['precio_oferta'];
+                $descuento_aplicado = $precio_original - $precio_unitario; // Monto descontado
+            } else {
+                // Sin promoción, usar el precio original
+                $precio_unitario = $precio_original;
+                $descuento_aplicado = 0;
+            }
+
+            // Calcular subtotal
+            $subtotal = $precio_unitario * $cantidad;
+
             // Insertar el detalle del pedido
-            $query_detalle = "INSERT INTO detalle_pedido (id_pedido, id_producto, id_emprendedor, cantidad, precio_unitario, subtotal, nombre_producto)
-                              VALUES (:id_pedido, :id_producto, :id_emprendedor, :cantidad, :precio_unitario, :subtotal, :nombre_producto)";
+            $query_detalle = "
+                INSERT INTO detalle_pedido (
+                    id_pedido, id_producto, id_emprendedor, cantidad, 
+                    precio_unitario, subtotal, nombre_producto, descuento_aplicado
+                ) VALUES (
+                    :id_pedido, :id_producto, :id_emprendedor, :cantidad, 
+                    :precio_unitario, :subtotal, :nombre_producto, :descuento_aplicado
+                )
+                ";
             $stmt_detalle = $db->prepare($query_detalle);
             $stmt_detalle->bindParam(':id_pedido', $id_pedido);
             $stmt_detalle->bindParam(':id_producto', $id_producto);
@@ -123,8 +186,10 @@ try {
             $stmt_detalle->bindParam(':cantidad', $cantidad);
             $stmt_detalle->bindParam(':precio_unitario', $precio_unitario);
             $stmt_detalle->bindParam(':subtotal', $subtotal);
-            $stmt_detalle->bindParam(':nombre_producto', $nombre_producto);
+            $stmt_detalle->bindParam(':nombre_producto', $producto['nombre_producto']);
+            $stmt_detalle->bindParam(':descuento_aplicado', $descuento_aplicado);
             $stmt_detalle->execute();
+
 
             // Calcular y registrar la comisión para el emprendedor
             $tasa_comision = 0.88;  //

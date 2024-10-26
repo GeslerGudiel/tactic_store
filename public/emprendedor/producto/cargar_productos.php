@@ -28,8 +28,7 @@ $query = "SELECT p.*, c.nombre_categoria
                OR p.descripcion LIKE :buscar 
                OR c.nombre_categoria LIKE :buscar 
                OR p.estado LIKE :buscar)
-          LIMIT 50";  // Cambia el valor 50 según sea necesario
-
+          LIMIT 50";  // Cantidad de productos solicitados
 
 $stmt = $db->prepare($query);
 $busqueda = "%$termino%";
@@ -55,27 +54,51 @@ if (count($productos) > 0): ?>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($productos as $producto): ?>
+            <?php foreach ($productos as $producto):
+                $nombreProducto = htmlspecialchars($producto['nombre_producto']);
+                $descripcionProducto = htmlspecialchars($producto['descripcion']);
+                $precioProducto = number_format($producto['precio'], 2);
+                $imagenProducto = htmlspecialchars($producto['imagen']);
+            ?>
                 <tr class="producto-item" data-id="<?= $producto['id_producto'] ?>">
-                    <td class="nombre"><?= htmlspecialchars($producto['nombre_producto']) ?></td>
-                    <td class="descripcion"><?= htmlspecialchars($producto['descripcion']) ?></td>
+                    <td class="nombre"><?= $nombreProducto ?></td>
+                    <td class="descripcion"><?= $descripcionProducto ?></td>
                     <td class="costo">Q. <?= number_format($producto['costo'], 2) ?></td>
-                    <td>Q. <?= number_format($producto['precio'], 2) ?></td>
+                    <td>Q. <?= $precioProducto ?></td>
                     <td class="stock"><?= $producto['stock'] ?></td>
                     <td class="categoria"><?= htmlspecialchars($producto['nombre_categoria']) ?></td>
                     <td>
-                        <img src="/comercio_electronico/uploads/productos/<?= htmlspecialchars($producto['imagen']) ?>"
-                            alt="Imagen del producto: <?= htmlspecialchars($producto['nombre_producto']) ?>" width="100">
+                        <img
+                            src="/comercio_electronico/uploads/productos/<?= $imagenProducto ?>"
+                            alt="Imagen del producto: <?= $nombreProducto ?>"
+                            width="100"
+                            loading="lazy">
                     </td>
-                    <td class="estado"><?= $producto['estado'] === 'disponible' ? 'Disponible' : 'No disponible' ?></td>
+                    <td class="estado">
+                        <?= $producto['estado'] === 'disponible' ? 'Disponible' : 'No disponible' ?>
+                    </td>
                     <td>
                         <i class="fas fa-edit text-primary btn-editar" data-producto='<?= json_encode($producto) ?>'></i>
                         <i class="fas fa-trash-alt text-danger btn-eliminar" data-id="<?= $producto['id_producto'] ?>"></i>
                     </td>
-
-
-                    </td>
                 </tr>
+                <!-- Datos estructurados (JSON-LD) -->
+                <script type="application/ld+json">
+                    {
+                        "@context": "https://schema.org/",
+                        "@type": "Product",
+                        "name": "<?= $nombreProducto ?>",
+                        "description": "<?= $descripcionProducto ?>",
+                        "image": "https://tactic-store.com/uploads/productos/<?= $imagenProducto ?>",
+                        "sku": "<?= $producto['id_producto'] ?>",
+                        "offers": {
+                            "@type": "Offer",
+                            "priceCurrency": "GTQ",
+                            "price": "<?= $precioProducto ?>",
+                            "availability": "<?= $producto['estado'] === 'disponible' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' ?>"
+                        }
+                    }
+                </script>
             <?php endforeach; ?>
         </tbody>
     </table>

@@ -9,7 +9,7 @@ if (!isset($_SESSION['id_cliente'])) {
     ];
     header("Location: login_cliente.php");
     exit;
-}
+} 
 
 include_once '../../src/config/database.php';
 $database = new Database();
