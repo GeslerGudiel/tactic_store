@@ -40,7 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->bindParam(':token', $token, PDO::PARAM_STR);
             $stmt->bindParam(':fecha_token', $fecha_token);
             $stmt->bindParam(':id_cliente', $cliente['id_cliente'], PDO::PARAM_INT);
-            $stmt->execute();
+            $stmt->execute(); 
 
             // Enviar el enlace de recuperación por correo electrónico
             $enlace = "http://localhost/comercio_electronico/public/client/reset_password.php?token=" . $token;

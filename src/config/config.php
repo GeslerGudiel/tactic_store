@@ -1,11 +1,12 @@
 <?php
-if (session_status() == PHP_SESSION_NONE) {// Verificar si una sesión ya está iniciada
+if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
 include_once 'database.php';  // Incluir la clase Database
 
-
+// Configurar la zona horaria
+date_default_timezone_set('America/Guatemala');
 
 function getDBConnection() {
     $database = new Database();
@@ -20,10 +21,4 @@ function showAlert($type, $message) {
             text: "' . $message . '"
         });
     </script>';
-}
-
-function redirectWithMessage($url, $type, $message) {
-    $_SESSION['message'] = ['type' => $type, 'text' => $message];
-    header("Location: $url");
-    exit;
 }

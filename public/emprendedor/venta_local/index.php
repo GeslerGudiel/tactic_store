@@ -20,5 +20,5 @@ $stmt_clientes->execute();
 $clientes = $stmt_clientes->fetchAll(PDO::FETCH_ASSOC);
 
 // Cargar la interfaz principal
-include 'templates/gestionar_venta_local.php';
+include 'gestionar_venta_local.php';
 ?>

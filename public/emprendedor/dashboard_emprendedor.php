@@ -362,25 +362,25 @@ if (isset($_SESSION['message'])) {
 
             $('#clientes-emprendedor-link').click(function(e) {
                 e.preventDefault();
-                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/ver_clientes.php');
+                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/clientes/index.php');
                 activarOpcion('#clientes-emprendedor-link');
             });
 
             $('#ventas-locales-link').click(function(e) {
                 e.preventDefault();
-                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/index.php');
+                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/gestionar_venta_local.php');
                 activarOpcion('#ventas-locales-link');
             });
 
             $('#historial-ventas-locales-link').click(function(e) {
                 e.preventDefault();
-                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/historial_ventas_locales.php');
+                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/historial/historial_ventas_locales.php');
                 activarOpcion('#historial-ventas-locales-link');
             });
 
             $('#analisis-ventas-locales-link').click(function(e) {
                 e.preventDefault();
-                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/analisis_venta_local/analisis_ventas_locales.php');
+                $('#content-area').load('/comercio_electronico/public/emprendedor/venta_local/analisis/index.php');
                 activarOpcion('#analisis-ventas-locales-link');
             });
 

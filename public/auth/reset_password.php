@@ -1,5 +1,28 @@
 <?php
-include_once '../../src/config/config.php';
+session_start();
+include_once '../../src/config/config.php'; // Verifica que la ruta esté correcta
+
+function redirectWithMessage($url, $type, $text) {
+    $_SESSION['message'] = [
+        'type' => $type,
+        'text' => $text
+    ];
+    header("Location: $url");
+    exit();
+}
+
+function enviarCorreoConfirmacion($correo) {
+    $asunto = "Confirmación de cambio de contraseña";
+    $mensaje = "
+        <h1>Contraseña cambiada exitosamente</h1>
+        <p>Tu contraseña ha sido actualizada correctamente. Si no solicitaste este cambio, contacta con soporte.</p>
+    ";
+    $headers = "From: no-reply@localshop.com\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+
+    mail($correo, $asunto, $mensaje, $headers);
+}
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $token = $_POST['token'];
@@ -14,8 +37,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         try {
             $db = getDBConnection();
 
-            // Verificar el token
-            $query = "SELECT id FROM usuarios WHERE token_recuperacion = :token";
+            // Verificar si el token es válido y está dentro del tiempo permitido (30 minutos)
+            $query = "SELECT id_emprendedor, correo, fecha_token FROM emprendedor WHERE token_recuperacion = :token";
             $stmt = $db->prepare($query);
             $stmt->bindParam(':token', $token, PDO::PARAM_STR);
             $stmt->execute();
@@ -23,18 +46,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($usuario) {
-                // Actualizar la contraseña y eliminar el token
-                $query = "UPDATE usuarios SET contrasena = :contrasena, token_recuperacion = NULL WHERE id = :id";
-                $stmt = $db->prepare($query);
-                $stmt->bindParam(':contrasena', $hashed_password, PDO::PARAM_STR);
-                $stmt->bindParam(':id', $usuario['id'], PDO::PARAM_INT);
-                $stmt->execute();
+                $fecha_token = new DateTime($usuario['fecha_token']);
+                $ahora = new DateTime();
+                $intervalo = $fecha_token->diff($ahora);
 
-                redirectWithMessage('login.php', 'success', 'Contraseña actualizada correctamente. Ahora puedes iniciar sesión.');
+                if ($intervalo->i <= 30) {
+                    // Actualizar la contraseña y eliminar el token
+                    $query = "UPDATE emprendedor SET contrasena = :contrasena, token_recuperacion = NULL, fecha_token = NULL WHERE id_emprendedor = :id";
+                    $stmt = $db->prepare($query);
+                    $stmt->bindParam(':contrasena', $hashed_password, PDO::PARAM_STR);
+                    $stmt->bindParam(':id', $usuario['id_emprendedor'], PDO::PARAM_INT);
+                    $stmt->execute();
+
+                    // Enviar correo de confirmación
+                    enviarCorreoConfirmacion($usuario['correo']);
+
+                    redirectWithMessage('login.php', 'success', 'Contraseña actualizada correctamente. Ahora puedes iniciar sesión.');
+                } else {
+                    redirectWithMessage('forgot_password.php', 'error', 'El token ha expirado. Solicita una nueva recuperación.');
+                }
             } else {
                 redirectWithMessage('reset_password.php?token=' . $token, 'error', 'Token no válido.');
             }
-
         } catch (PDOException $e) {
             redirectWithMessage('reset_password.php?token=' . $token, 'error', 'Error: ' . $e->getMessage());
         }
@@ -55,7 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Restablecer Contraseña</title>
     <link href="../assets/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
@@ -63,7 +96,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <h2 class="text-center">Restablecer Contraseña</h2>
 
         <?php
-        include_once '../../src/config/config.php';
         if (isset($_SESSION['message'])) {
             echo '<script>
                 Swal.fire({
@@ -94,13 +126,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <button type="submit" class="btn btn-success w-100"><i class="fas fa-key"></i> Restablecer Contraseña</button>
         </form>
     </div>
+
     <script src="../assets/js/bootstrap.bundle.min.js"></script>
     <script>
         // Funcionalidad para mostrar/ocultar la nueva contraseña
         const toggleNewPassword = document.querySelector('#toggleNewPassword');
         const newPassword = document.querySelector('#nueva_contrasena');
 
-        toggleNewPassword.addEventListener('click', function (e) {
+        toggleNewPassword.addEventListener('click', function () {
             const type = newPassword.getAttribute('type') === 'password' ? 'text' : 'password';
             newPassword.setAttribute('type', type);
             this.classList.toggle('fa-eye');
@@ -110,7 +143,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const toggleConfirmPassword = document.querySelector('#toggleConfirmPassword');
         const confirmPassword = document.querySelector('#confirmar_contrasena');
 
-        toggleConfirmPassword.addEventListener('click', function (e) {
+        toggleConfirmPassword.addEventListener('click', function () {
             const type = confirmPassword.getAttribute('type') === 'password' ? 'text' : 'password';
             confirmPassword.setAttribute('type', type);
             this.classList.toggle('fa-eye');
