@@ -5,7 +5,7 @@ if (!isset($_SESSION['id_emprendedor']) || $_SESSION['usuario_rol'] !== 'emprend
     exit;
 }
 
-include_once '../../../src/config/database.php';
+include_once '../../../src/config/config.php';
 
 $emprendedor_id = $_SESSION['id_emprendedor'];
 

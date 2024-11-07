@@ -1,36 +1,29 @@
 <?php
 session_start();
 
-// Verificar inactividad y destruir la sesión si ha pasado más de 30 minutos
-if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > 1800)) {
-    session_unset();  // Elimina todas las variables de sesión
-    session_destroy(); // Destruye la sesión
-    header("Location: ../auth/login.php");
-    exit;
-}
-$_SESSION['LAST_ACTIVITY'] = time(); // Actualiza el timestamp de la actividad
+// Configurar la zona horaria
+date_default_timezone_set('America/Guatemala');
 
-// Verificar si el usuario tiene rol de emprendedor y está autenticado
+// Verificar si el usuario tiene rol de emprendedor y está autenticado antes de la verificación de inactividad
 if (!isset($_SESSION['id_emprendedor']) || $_SESSION['usuario_rol'] !== 'emprendedor') {
     header("Location: ../auth/login.php");
     exit;
 }
 
+// Verificar inactividad y marcar la sesión como expirada si ha pasado más de 30 minutos
+if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > 1800)) { // Cambia a 1800 para 30 minutos
+    // Destruir la sesión y redirigir a la página de sesión expirada
+    session_unset();
+    session_destroy();
+    header("Location: ../auth/expired_session.php");
+    exit;
+}
+
+// Actualiza el timestamp de la actividad solo después de confirmar autenticación y sin expiración
+$_SESSION['LAST_ACTIVITY'] = time();
+
 // Obtener el estado del emprendedor desde la sesión
 $estado_emprendedor = $_SESSION['estado_emprendedor'] ?? null; // Manejar posibles valores nulos
-
-// Mostrar un mensaje si existe en la sesión
-if (isset($_SESSION['message'])) {
-    echo "<script>
-    Swal.fire({
-        icon: '" . ($_SESSION['message']['type'] ?? 'info') . "',
-        title: 'Atención',
-        text: '" . ($_SESSION['message']['text'] ?? '') . "',
-        confirmButtonText: 'Aceptar'
-    });
-    </script>";
-    unset($_SESSION['message']); // Eliminar mensaje después de mostrarlo
-}
 ?>
 
 <!DOCTYPE html>
@@ -225,7 +218,7 @@ if (isset($_SESSION['message'])) {
                 <i class="fas fa-chart-line"></i> <span>Analisis de Ventas</span>
             </a>
         <?php endif; ?>
-            
+
         <a href="logout.php" class="nav-link">
             <i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span>
         </a>
@@ -241,6 +234,33 @@ if (isset($_SESSION['message'])) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Tiempo límite de inactividad en milisegundos (30 minutos = 1800000 ms)
+        const INACTIVITY_LIMIT = 1800000; // 30 minutos
+
+        let inactivityTimer;
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                // Redirigir a la página de sesión expirada después de 30 minutos de inactividad
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sesión Expirada',
+                    text: 'Tu sesión ha caducado por inactividad. Por favor, inicia sesión nuevamente.',
+                    confirmButtonText: 'Aceptar'
+                }).then(() => {
+                    window.location.href = "../auth/expired_session.php";
+                });
+            }, INACTIVITY_LIMIT);
+        }
+
+        // Resetear el temporizador en cada evento de usuario
+        window.onload = resetInactivityTimer;
+        document.onmousemove = resetInactivityTimer;
+        document.onkeypress = resetInactivityTimer;
+        document.onclick = resetInactivityTimer;
+        document.onscroll = resetInactivityTimer;
+
         function activarOpcion(selector) {
             $('.sidebar a').removeClass('active'); // Remover clases activas de otros enlaces
             $(selector).addClass('active'); // Agregar clase activa al enlace seleccionado
@@ -263,7 +283,7 @@ if (isset($_SESSION['message'])) {
 
             // Llamar a la función al cargar la página y cada minuto para mantener actualizado el contador
             actualizarNotificaciones();
-            setInterval(actualizarNotificaciones, 60000); // Actualiza cada minuto
+            setInterval(actualizarNotificaciones, 1800000); // Actualiza cada minuto
 
             // Cargar el contenido de notificaciones al hacer clic en el ícono
             $('#notificacion-link').click(function(e) {

@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Validar y sanitizar los datos del producto
 $nombre_producto = htmlspecialchars(strip_tags($_POST['nombre_producto']));
-$slug = generarSlug($nombre_producto);  // Generar slug para URL amigable
+$slug = generarSlug($nombre_producto);  // Generar slug para URL que sea entendible para el cliente
 $descripcion = htmlspecialchars(strip_tags($_POST['descripcion']));
 $costo = filter_var($_POST['costo'], FILTER_VALIDATE_FLOAT);
 $precio = filter_var($_POST['precio'], FILTER_VALIDATE_FLOAT);
@@ -34,7 +34,7 @@ $stock = filter_var($_POST['stock'], FILTER_VALIDATE_INT);
 $estado = htmlspecialchars(strip_tags($_POST['estado']));
 $id_categoria = filter_var($_POST['id_categoria'], FILTER_VALIDATE_INT);
 
-// Metadatos adicionales (opcional para SEO)
+// Metadatos adicionales  para SEO
 $meta_title = isset($_POST['meta_title']) ? htmlspecialchars(strip_tags($_POST['meta_title'])) : $nombre_producto;
 $meta_description = isset($_POST['meta_description']) ? htmlspecialchars(strip_tags($_POST['meta_description'])) : substr($descripcion, 0, 160);
 
